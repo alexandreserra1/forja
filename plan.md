@@ -125,7 +125,7 @@ INSERT INTO question_option (question_id, label, value, sort_order) VALUES
 INSERT INTO question_option (question_id, label, value, sort_order) VALUES
   (3, 'Força', 'strength', 1),
   (3, 'Condicionamento', 'conditioning', 2),
-  (3, 'Técnica', 'technique', 1);
+  (3, 'Técnica', 'technique', 3);
 
 -- Interpretações: resposta -> atributo
 INSERT INTO answer_rule (question_id, option_value, sets_attribute, attribute_value) VALUES
@@ -161,7 +161,7 @@ INSERT INTO exercise (name, movement_pattern_id, level, focus) VALUES
 Mora no serviço (camada teal). Lógica da Fase 0, sem inteligência:
 
 1. Lê os atributos do perfil: `level`, `days`, `goal`.
-2. Filtra exercícios: pega os do `level` do usuário (e abaixo, se quiser).
+2. Filtra exercícios: pega os do `level` do usuário **e abaixo** (advanced enxerga advanced+intermediate+beginner). Isso garante candidatos mesmo p/ combinações sem exercício próprio (ex: advanced+strength).
    - Se `goal = technique`, prioriza `focus = technique`. Senão prioriza o foco do objetivo.
 3. Distribui em `days` dias, 3–4 exercícios por dia, variando o padrão de movimento.
 4. Salva em `generated_workout` e devolve.
