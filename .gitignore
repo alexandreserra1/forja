@@ -1,0 +1,18 @@
+# Go
+/bin/
+/cmd/server/server
+*.test
+*.out
+
+# SQLite database (gerado a partir de schema.sql + seed.sql)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Node / Vite (M6)
+/web/node_modules/
+/web/dist/
+
+# macOS
+.DS_Store
