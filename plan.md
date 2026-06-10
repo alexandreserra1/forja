@@ -1,265 +1,271 @@
-# Fase 0 — Fundação
+# cfit — Roadmap de evolução
 
-> Objetivo: uma fatia vertical fina que atravessa as três zonas.
-> O usuário responde perguntas → vira perfil → motor MÍNIMO monta um treino básico → aparece na tela.
-> O motor começa burro de propósito. A inteligência vem nas fases seguintes.
+## Estado atual (tudo verde ✅)
 
----
+Todas as fases abaixo estão implementadas, testadas (integração + e2e) e com suite verde.
 
-## O que esta fase prova
+| Feature | Schema | Repo | Service | Handler | React | e2e |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Questionário (F0) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Bloco periodizado (F1) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| AutoReg força (F2) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Equipamento + substituição (F3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Conjugados (F5A) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Condicionamento / WODs (F5B) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| AutoReg WOD — trilho independente | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Multi-atleta + seed determinístico (F6A) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Prioridades / pontos fracos (F6B) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Métricas do atleta / volume scaling (F6D) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Não-repetição por histórico (F6C) | ✅ | ✅ | ✅ | — | — | — |
 
-Que as três zonas conversam de ponta a ponta:
-- **Dados** (SQLite): perguntas, opções, regras de interpretação, exercícios.
-- **Servidor** (Go em camadas): handler → serviço → repository (interface) → SQLite.
-- **Cliente** (React): mostra perguntas, envia respostas, exibe o treino gerado.
-
-Quando você abrir o navegador, responder as perguntas e ver um treino aparecer, a Fase 0 está concluída.
-
----
-
-## Princípios que NÃO podem ser violados (definem a arquitetura)
-
-1. **A interface congela a fachada e liberta as entranhas.** O serviço depende do contrato `Repository`, nunca do SQLite concreto. Trocar SQLite por Postgres amanhã = trocar só a implementação.
-2. **A regra de negócio nunca mora junto do acesso a dados.** Lógica de montar treino mora no serviço (teal). SQL mora no repository (cinza). Se SQL vazar pro serviço, ou regra vazar pro repository, está errado.
-3. **Questionário é dado, não código.** Perguntas, opções e interpretações vivem em tabelas. O código é um leitor genérico.
-4. **Três criaturas separadas:** pergunta (o que se pergunta) ≠ resposta do usuário (o que ele respondeu) ≠ interpretação (o que a resposta significa pro treino).
+> **F6C:** `RecentExerciseIDs`, `RecentWodMovementIDs` e `deprioritizeRecent` estão ativos
+> internamente no motor. Sem tela dedicada — é internal do service.
 
 ---
 
-## Esquema do banco (SQLite)
+## Fase A — Auth (próxima — portão antes de usuário real)
 
+**Por quê agora:** sem auth qualquer URL dá acesso aos treinos de qualquer atleta.
+
+### DB
 ```sql
--- ============================================================
--- CRIATURA 1: a pergunta (o que aparece na tela)
--- ============================================================
-CREATE TABLE question (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    text        TEXT    NOT NULL,              -- "Há quanto tempo você treina?"
-    type        TEXT    NOT NULL,              -- 'single_choice' | 'multi_choice' | 'number'
-    sort_order  INTEGER NOT NULL,              -- ordem de exibição
-    show_when   TEXT                           -- condição p/ aparecer (NULL = sempre). Fase 0: tudo NULL.
+CREATE TABLE athlete_auth (
+    athlete_id    INTEGER PRIMARY KEY REFERENCES athlete(id) ON DELETE CASCADE,
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,   -- bcrypt cost 12
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
-
-CREATE TABLE question_option (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    question_id INTEGER NOT NULL REFERENCES question(id),
-    label       TEXT    NOT NULL,              -- "Menos de 1 ano"
-    value       TEXT    NOT NULL,              -- "lt_1y" (valor interno estável)
-    sort_order  INTEGER NOT NULL
-);
-
--- ============================================================
--- CRIATURA 3: a interpretação (resposta -> atributo do perfil)
--- É isto que alimenta o motor. Editável sem tocar no código.
--- ============================================================
-CREATE TABLE answer_rule (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    question_id     INTEGER NOT NULL REFERENCES question(id),
-    option_value    TEXT    NOT NULL,          -- "lt_1y"
-    sets_attribute  TEXT    NOT NULL,          -- "level"
-    attribute_value TEXT    NOT NULL           -- "beginner"
-);
-
--- ============================================================
--- O catálogo de exercícios
--- ============================================================
-CREATE TABLE movement_pattern (
-    id   INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE                  -- "squat", "hinge", "push", "pull"
-);
-
-CREATE TABLE exercise (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    name                TEXT    NOT NULL,       -- "Back Squat"
-    movement_pattern_id INTEGER NOT NULL REFERENCES movement_pattern(id),
-    level               TEXT    NOT NULL,       -- 'beginner' | 'intermediate' | 'advanced'
-    focus               TEXT    NOT NULL        -- 'technique' | 'strength' | 'conditioning'
-);
-
--- ============================================================
--- CRIATURA 2: a resposta do usuário + o perfil + o treino gerado
--- (Fase 0: um único usuário implícito, sem auth ainda)
--- ============================================================
-CREATE TABLE user_answer (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    question_id  INTEGER NOT NULL REFERENCES question(id),
-    answer_value TEXT    NOT NULL              -- o "value" da opção escolhida
-);
-
--- Perfil = atributos derivados das respostas via answer_rule.
--- Fase 0 pode derivar em memória; tabela opcional para persistir.
-CREATE TABLE profile_attribute (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    attribute_name  TEXT NOT NULL,             -- "level"
-    attribute_value TEXT NOT NULL              -- "beginner"
-);
-
-CREATE TABLE generated_workout (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    day_number  INTEGER NOT NULL,              -- dia 1, 2, 3...
-    exercise_id INTEGER NOT NULL REFERENCES exercise(id)
-);
+CREATE INDEX idx_athlete_auth_email ON athlete_auth(email);
 ```
 
-### Dados de seed (mínimo para a fatia funcionar)
-
-```sql
--- Perguntas básicas
-INSERT INTO question (text, type, sort_order, show_when) VALUES
-  ('Há quanto tempo você treina?', 'single_choice', 1, NULL),
-  ('Quantos dias por semana você quer treinar?', 'single_choice', 2, NULL),
-  ('Qual seu principal objetivo?', 'single_choice', 3, NULL);
-
--- Opções da pergunta 1 (tempo de treino)
-INSERT INTO question_option (question_id, label, value, sort_order) VALUES
-  (1, 'Menos de 1 ano', 'lt_1y', 1),
-  (1, '1 a 3 anos', '1_3y', 2),
-  (1, 'Mais de 3 anos', 'gt_3y', 3);
-
--- Opções da pergunta 2 (dias)
-INSERT INTO question_option (question_id, label, value, sort_order) VALUES
-  (2, '3 dias', '3', 1),
-  (2, '4 dias', '4', 2);
-
--- Opções da pergunta 3 (objetivo)
-INSERT INTO question_option (question_id, label, value, sort_order) VALUES
-  (3, 'Força', 'strength', 1),
-  (3, 'Condicionamento', 'conditioning', 2),
-  (3, 'Técnica', 'technique', 3);
-
--- Interpretações: resposta -> atributo
-INSERT INTO answer_rule (question_id, option_value, sets_attribute, attribute_value) VALUES
-  (1, 'lt_1y', 'level', 'beginner'),
-  (1, '1_3y',  'level', 'intermediate'),
-  (1, 'gt_3y', 'level', 'advanced'),
-  (2, '3',     'days',  '3'),
-  (2, '4',     'days',  '4'),
-  (3, 'strength',     'goal', 'strength'),
-  (3, 'conditioning', 'goal', 'conditioning'),
-  (3, 'technique',    'goal', 'technique');
-
--- Padrões de movimento
-INSERT INTO movement_pattern (name) VALUES ('squat'), ('hinge'), ('push'), ('pull');
-
--- Exercícios (alguns por nível/foco para o motor mínimo ter o que escolher)
-INSERT INTO exercise (name, movement_pattern_id, level, focus) VALUES
-  ('Air Squat',        1, 'beginner',     'technique'),
-  ('Back Squat',       1, 'intermediate', 'strength'),
-  ('Overhead Squat',   1, 'advanced',     'technique'),
-  ('Deadlift',         2, 'intermediate', 'strength'),
-  ('Kettlebell Swing', 2, 'beginner',     'conditioning'),
-  ('Push-up',          3, 'beginner',     'technique'),
-  ('Strict Press',     3, 'intermediate', 'strength'),
-  ('Ring Row',         4, 'beginner',     'technique'),
-  ('Pull-up',          4, 'intermediate', 'strength');
-```
-
----
-
-## O motor MÍNIMO (regra burra, de propósito)
-
-Mora no serviço (camada teal). Lógica da Fase 0, sem inteligência:
-
-1. Lê os atributos do perfil: `level`, `days`, `goal`.
-2. Filtra exercícios: pega os do `level` do usuário **e abaixo** (advanced enxerga advanced+intermediate+beginner). Isso garante candidatos mesmo p/ combinações sem exercício próprio (ex: advanced+strength).
-   - Se `goal = technique`, prioriza `focus = technique`. Senão prioriza o foco do objetivo.
-3. Distribui em `days` dias, 3–4 exercícios por dia, variando o padrão de movimento.
-4. Salva em `generated_workout` e devolve.
-
-> Isso é deliberadamente simplório. Na Fase 1 ele vira o motor de periodização de verdade — e como mora todo atrás do contrato, você troca a lógica sem mexer em handler, repository nem React.
-
----
-
-## Estrutura de pastas (Go)
-
-```
-treino/
-├── go.mod
-├── cmd/
-│   └── server/
-│       └── main.go              # liga tudo: abre DB, injeta repo no serviço, sobe HTTP
-├── internal/
-│   ├── domain/
-│   │   └── models.go            # structs: Question, Option, Exercise, Workout, Profile
-│   ├── repository/
-│   │   ├── repository.go        # AS INTERFACES (o contrato roxo)
-│   │   └── sqlite.go            # implementação concreta (a caixa cinza)
-│   ├── service/
-│   │   └── periodization.go     # o motor mínimo (a caixa teal — o cérebro)
-│   └── handler/
-│       └── http.go              # handlers HTTP (a caixa azul)
-├── db/
-│   ├── schema.sql               # o CREATE TABLE acima
-│   └── seed.sql                 # os INSERT acima
-└── web/                         # o React vem aqui (pode ser projeto separado também)
-```
-
-### O contrato (repository.go) — o coração da arquitetura
-
+### Domain (`internal/domain/models.go`)
 ```go
-package repository
-
-import "treino/internal/domain"
-
-type QuestionRepository interface {
-    ListQuestions() ([]domain.Question, error)
-    ListOptions(questionID int) ([]domain.Option, error)
+type AthleteAuth struct {
+    AthleteID    int    `json:"athlete_id"`
+    Email        string `json:"email"`
+    PasswordHash string `json:"-"`
+    CreatedAt    string `json:"created_at"`
 }
+type TokenClaims struct{ AthleteID int `json:"athlete_id"` }
+```
 
-type AnswerRepository interface {
-    SaveAnswer(questionID int, value string) error
-    ListAnswers() ([]domain.Answer, error)
-    ListAnswerRules() ([]domain.AnswerRule, error)
-}
-
-type ExerciseRepository interface {
-    ListByLevel(level string) ([]domain.Exercise, error)
-}
-
-type WorkoutRepository interface {
-    SaveWorkout(w []domain.GeneratedWorkout) error
-    ListWorkout() ([]domain.GeneratedWorkout, error)
+### Repository (`internal/repository/repository.go` + `sqlite_auth.go` novo)
+```go
+type AuthRepository interface {
+    CreateAuth(athleteID int, email, passwordHash string) error
+    GetAuthByEmail(email string) (*domain.AthleteAuth, error)
 }
 ```
 
-> O serviço recebe essas interfaces no construtor (injeção de dependência). Nunca importa `sqlite.go` diretamente.
-
----
-
-## Endpoints da API (Fase 0)
-
-```
-GET  /api/questions          -> lista perguntas + opções (React desenha o questionário)
-POST /api/answers            -> recebe as respostas do usuário
-POST /api/generate           -> roda o motor mínimo, salva e devolve o treino
-GET  /api/workout            -> devolve o treino gerado
+### Service (`internal/service/auth.go` — novo arquivo)
+```go
+func (s *Service) Register(name, email, password string) (*domain.Athlete, string, error)
+func (s *Service) Login(email, password string) (*domain.Athlete, string, error)
+func (s *Service) ValidateToken(tokenStr string) (athleteID int, err error)
+// jwtSecret lido de env AUTH_SECRET; erro de boot se ausente
 ```
 
+### Middleware (`internal/handler/auth_middleware.go` — novo)
+```go
+func RequireAuth(svc *service.Service) func(http.Handler) http.Handler
+func athleteIDFromCtx(r *http.Request) int
+```
+
+### Handler (`internal/handler/http.go`)
+```
+Novas rotas públicas:
+  POST /api/auth/register  →  postAuthRegister()
+  POST /api/auth/login     →  postAuthLogin()
+Todas as outras rotas: envolvidas com RequireAuth.
+athleteID(r) lê do contexto (não mais do header X-Athlete-Id).
+```
+
+### Rate limiter (`internal/handler/ratelimit.go` — novo)
+```go
+// Token bucket por IP, só para /api/auth/*: 10 req/min, burst 3.
+// golang.org/x/time/rate + sync.Map — sem Redis.
+func RateLimit(rps float64, burst int) func(http.Handler) http.Handler
+```
+
+### React
+- `web/src/components/AuthForm.jsx` — login + cadastro (toggle)
+- `api.js`: `register(name, email, password)`, `login(email, password)`
+  → salvam token em localStorage; `headers()` passa `Authorization: Bearer <token>`
+- `App.jsx`: estado `authed bool`; se falso → renderiza `<AuthForm>`
+
+### Dependências Go
+```
+golang.org/x/crypto           (bcrypt)
+github.com/golang-jwt/jwt/v5  (JWT)
+golang.org/x/time             (rate limiter)
+```
+
+### Testes
+- `internal/repository/sqlite_auth_test.go` — CreateAuth, GetAuthByEmail, UNIQUE email
+- `internal/handler/http_test.go` — register → login → token → recurso protegido → 401 sem token
+- `web/e2e/auth.spec.js` — cadastrar, logar, gerar bloco, deslogar
+
+### Deploy (junto com auth)
+```
+deploy/
+  Caddyfile          ← auto-HTTPS via Let's Encrypt, proxy /api/* → :8080, serve dist/
+  docker-compose.yml ← caddy + go server
+  Dockerfile.server  ← build Go
+```
+
 ---
 
-## Marcos de validação (faça nesta ordem)
+## Fase B — 1RM do atleta
 
-- [ ] **M1 — Banco de pé.** `schema.sql` + `seed.sql` rodam no SQLite sem erro. `SELECT` retorna perguntas e exercícios.
-- [ ] **M2 — Repository lê.** Em Go, a implementação SQLite lista perguntas e exercícios. Teste isso com um `main` temporário ou um teste.
-- [ ] **M3 — Contrato no lugar.** O serviço recebe as interfaces (não o SQLite concreto). Confirme: `service` não importa `sqlite`.
-- [ ] **M4 — Motor mínimo gera.** Dado um perfil fixo (ex: beginner, 3 dias, technique), o serviço devolve um treino coerente. Teste sem HTTP ainda.
-- [ ] **M5 — API responde.** `GET /api/questions` devolve JSON. `POST /api/generate` devolve um treino em JSON. Teste com curl.
-- [ ] **M6 — React mostra.** Tela lista as perguntas, envia respostas, chama generate, exibe o treino. **Fim da Fase 0.**
+**Por quê:** base para calibração futura de % de carga real a partir do RPE.
+
+### DB
+```sql
+CREATE TABLE athlete_1rm (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    athlete_id  INTEGER NOT NULL REFERENCES athlete(id),
+    exercise_id INTEGER NOT NULL REFERENCES exercise(id),
+    weight_kg   REAL    NOT NULL CHECK (weight_kg > 0),
+    recorded_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (athlete_id, exercise_id)   -- UPSERT: só o mais recente
+);
+CREATE INDEX idx_athlete_1rm_athlete ON athlete_1rm(athlete_id);
+```
+
+### Domain
+```go
+type OneRM struct {
+    ID           int     `json:"id"`
+    AthleteID    int     `json:"athlete_id"`
+    ExerciseID   int     `json:"exercise_id"`
+    ExerciseName string  `json:"exercise_name"`
+    WeightKg     float64 `json:"weight_kg"`
+    RecordedAt   string  `json:"recorded_at"`
+}
+```
+
+### Repository (`sqlite_1rm.go` — novo)
+```go
+type OneRMRepository interface {
+    Save1RM(athleteID, exerciseID int, weightKg float64) error  // UPSERT
+    List1RMs(athleteID int) ([]domain.OneRM, error)             // JOIN exercise
+}
+```
+
+### Service + Handler
+```go
+func (s *Service) Save1RM(athleteID, exerciseID int, weightKg float64) error
+func (s *Service) List1RMs(athleteID int) ([]domain.OneRM, error)
+// GET  /api/1rm
+// POST /api/1rm  { exercise_id, weight_kg }
+```
+
+### React
+- `web/src/components/ProfileView.jsx` — métricas + lista de 1RMs editável
+- `api.js`: `fetchOneRMs()`, `saveOneRM(exerciseId, weightKg)`
 
 ---
 
-## Atalhos conscientes da Fase 0 (dívida que pagamos depois)
+## Fase C — Timer (frontend puro, zero backend)
 
-- Sem autenticação — um único usuário implícito.
-- `show_when` todo NULL — questionário ainda não ramifica (vira adaptativo na Fase 1+).
-- Motor burro — sem periodização real ainda.
-- Sem cache, sem Postgres, sem Docker.
-- Perfil pode ser derivado em memória a cada request (a tabela `profile_attribute` é opcional nesta fase).
+### Componentes
+```
+TimerView.jsx    — dígitos grandes (monospace ≥4rem), barra SVG circular, botões ≥56px
+                   modes: amrap (countdown) | fortime (stopwatch) | emom (interval + round)
+TimerControls.jsx — seletor de modo + duração antes de iniciar
+```
 
-Cada atalho é uma porta que a arquitetura em camadas mantém aberta para evoluir sem reescrever.
+### Comportamentos
+- Últimos 10s: fundo muda para vermelho
+- Sonoro: bipe 3s finais + bipe longo no zero (`AudioContext` — sem arquivo externo)
+- Háptico: `navigator.vibrate([200])` por round EMOM; `[500]` no fim
+- Toggle mudo + vibração (localStorage)
+
+### Integração com WodCard
+- Botão "Iniciar timer" pré-preenche mode/duration do WOD
+- Ao fechar timer → WodCard abre input de RPE automaticamente
 
 ---
 
-## Quando terminar
+## Fase D — Dashboard (frontend puro, zero backend)
 
-Quando o M6 estiver verde — você responde no navegador e vê o treino — me avise e avançamos para a **Fase 1**: transformar o motor mínimo em periodização de verdade e tornar o questionário adaptativo (ativar o `show_when`).
+### Componente `DashboardView.jsx`
+Dados via `fetchBlock()` + `fetchWeek(n)` já existentes. Seções:
+- Badge de fase + RPE-alvo da semana
+- Progresso semanal: N/M dias registrados
+- Próxima sessão: dia + exercícios pendentes
+- Ação rápida "Abrir treino de hoje"
+
+---
+
+## Fase E — Refinamentos do motor (inteligência incremental)
+
+### E1 — Substituição por fase
+`substitution_rule.phase` existe no schema mas o service passa `phase=NULL`.
+Mudar `GetSubstitutionRule(pattern, phase, missingEquipmentID)` para preferir regras com phase.
+
+### E2 — Viés de RPE por atleta
+```go
+// service/metrics.go
+func (s *Service) RPEBias(athleteID int) (float64, error)
+// avg(actual_rpe - target_rpe) dos últimos N logs.
+// Se viés > +1.0: descontar na detecção de estagnação.
+// GET /api/metrics/bias (informativo)
+```
+
+### E3 — Continuidade bloco-a-bloco
+```go
+// service/metrics.go
+func blockTransitionFactor(athleteID int) float64
+// Se média actual < target - 1.0 no bloco anterior: +0.25 no base_rpe do novo bloco.
+// Rastro em autoreg_adjustment com trigger='block_transition'. Sem schema novo.
+```
+
+### E4 — Progresso real via reps_achieved
+```sql
+ALTER TABLE session_log ADD COLUMN reps_achieved INTEGER;
+```
+Motor detecta "mesmo RPE + mais reps" = progresso real → não alivia indevidamente.
+
+---
+
+## Decisões de infraestrutura (registradas)
+
+| Decisão | Escolha | Quando reavaliar |
+|---|---|---|
+| Paginação | ❌ não agora (payloads ≤8KB) | Coaches com 50+ atletas |
+| API Gateway | ❌ overhead desnecessário | Múltiplos serviços |
+| Proxy reverso | ✅ Caddy (junto com auth) | — |
+| Rate limiting | ✅ em memória só em /api/auth/* | Segunda instância → Redis |
+| HTTPS | ✅ Caddy auto-HTTPS (Let's Encrypt) | — |
+| Redis | ❌ não agora | Rate limit distribuído |
+| WebSocket | ❌ não agora | Live coaching |
+| Paginação (keyset) | ❌ não agora | `?after_id=X&limit=20` quando chegar |
+
+---
+
+## Verificação de cada fase
+
+```bash
+# Fase A (Auth)
+go build ./... && go test ./... | grep -E 'ok|FAIL'
+go list -deps ./internal/service/ | grep sqlite   # deve ser vazio
+npx playwright test --workers=1
+
+# Fase B (1RM)
+go test ./internal/repository/ -run TestOneRM
+go test ./internal/handler/ -run TestIntegration_1RM
+
+# Fase C (Timer)
+npm run build
+npx playwright test e2e/timer.spec.js
+
+# Fase D (Dashboard)
+npx playwright test e2e/dashboard.spec.js
+```
+
+## Dívida declarada (não esquecer)
+- Threshold WOD `8.0` e granularidade (pular 1) = calibrar com treinador antes de usuário real.
+- `substitution_rule.phase` ignorado pelo service (E1 resolve).
+- Fase 0 (`POST /api/generate`) ativa mas obsoleta — remover depois que auth estabilizar.
+- Métricas de competição: futuro, aguarda definição do treinador.

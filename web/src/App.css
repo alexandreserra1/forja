@@ -1,0 +1,38 @@
+/* Estilos da Fase 0 — escopados ao questionário p/ não vazar nas telas Tailwind. */
+
+.questionnaire .question {
+  border: 1px solid #e2e2e2;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.questionnaire .question legend {
+  font-weight: 600;
+  padding: 0 0.4rem;
+}
+
+.questionnaire .option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  cursor: pointer;
+}
+
+.questionnaire button {
+  margin-top: 0.5rem;
+  padding: 0.65rem 1.3rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.questionnaire button:disabled {
+  background: #9db8f0;
+  cursor: not-allowed;
+}
