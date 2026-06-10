@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Questionnaire from './components/Questionnaire'
 import BlockView from './components/BlockView'
+import DashboardView from './components/DashboardView'
 import WeekView from './components/WeekView'
 import AuthForm from './components/AuthForm'
 import ProfileView from './components/ProfileView'
@@ -31,6 +32,7 @@ export default function App() {
   // authRequired: null = ainda verificando, false = dev mode (sem auth), true = prod (exige JWT)
   const [authRequired, setAuthRequired] = useState(null)
   const [showProfile,     setShowProfile]     = useState(false)
+  const [showBlock,       setShowBlock]       = useState(false) // true = BlockView clássico
   const [timerPhase,      setTimerPhase]      = useState(null) // null | 'setup' | 'running'
   const [timerConfig,     setTimerConfig]     = useState(null)
   const [authed, setAuthed] = useState(() => getToken() !== null)
@@ -125,6 +127,7 @@ export default function App() {
     setAthlete(id)
     setCurrentAthlete(id)
     setActiveWeek(null)
+    setShowBlock(false)
     setSelected({})
     setSelectedEquipment([])
     setSelectedPriorities([])
@@ -217,6 +220,7 @@ export default function App() {
   function handleRestart() {
     setOverview(null)
     setActiveWeek(null)
+    setShowBlock(false)
     setSelected({})
     setSelectedEquipment([])
     setSelectedPriorities([])
@@ -303,16 +307,35 @@ export default function App() {
         <p>Carregando…</p>
       ) : activeWeek != null ? (
         <WeekView weekNumber={activeWeek} onBack={() => setActiveWeek(null)} />
+      ) : overview && showBlock ? (
+        <>
+          <button
+            onClick={() => setShowBlock(false)}
+            className="mb-4 text-sm text-blue-600 hover:underline"
+          >
+            ← Voltar ao dashboard
+          </button>
+          <BlockView
+            overview={overview}
+            onSelectWeek={(n) => { setShowBlock(false); setActiveWeek(n) }}
+            onRestart={handleRestart}
+            adjustments={adjustments}
+            onEvaluate={handleEvaluate}
+            evalMsg={evalMsg}
+            evaluating={evaluating}
+            substitutions={substitutions}
+          />
+        </>
       ) : overview ? (
-        <BlockView
+        <DashboardView
           overview={overview}
-          onSelectWeek={setActiveWeek}
+          onOpenWeek={(n) => setActiveWeek(n)}
+          onOpenBlock={() => setShowBlock(true)}
           onRestart={handleRestart}
-          adjustments={adjustments}
           onEvaluate={handleEvaluate}
-          evalMsg={evalMsg}
           evaluating={evaluating}
-          substitutions={substitutions}
+          evalMsg={evalMsg}
+          adjustments={adjustments}
         />
       ) : (
         <Questionnaire

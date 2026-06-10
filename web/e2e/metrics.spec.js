@@ -20,5 +20,5 @@ test('preenche métricas opcionais e gera o bloco', async ({ page }) => {
   await expect(page.locator('#m-sport')).toHaveValue('weightlifting')
 
   await page.getByRole('button', { name: 'Gerar treino' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
 })

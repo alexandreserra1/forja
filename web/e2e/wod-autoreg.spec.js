@@ -12,7 +12,7 @@ test('WOD: marcar feito com RPE individual → avaliar mostra trilho WOD', async
   await page.locator('input[name="q-3"][value="strength"]').check()
   await page.locator('input[name="q-4"][value="8"]').check()
   await page.getByRole('button', { name: 'Gerar treino' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
 
   // Abre a semana 1 (onde houver WODs).
   await page.getByRole('button', { name: /Semana 1\b/ }).click()
@@ -38,7 +38,7 @@ test('WOD: marcar feito com RPE individual → avaliar mostra trilho WOD', async
 
   // Volta ao bloco e reavalia.
   await page.getByRole('button', { name: 'Voltar ao bloco' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
   await page.getByRole('button', { name: 'Reavaliar com base nos registros' }).click()
 
   // A mensagem de avaliação aparece e inclui o resultado do trilho WOD.

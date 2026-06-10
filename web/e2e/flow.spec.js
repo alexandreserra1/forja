@@ -16,7 +16,7 @@ test('questionário -> bloco -> marcar feito -> variação por fase', async ({ p
   await page.getByRole('button', { name: 'Gerar treino' }).click()
 
   // --- Visão do bloco: 8 semanas, a última é deload ---
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Semana \d/ })).toHaveCount(8)
   await expect(page.getByRole('button', { name: /Semana 8.*Deload/ })).toBeVisible()
 

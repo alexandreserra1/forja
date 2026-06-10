@@ -12,7 +12,7 @@ test('conjugado renderiza a sequência de componentes', async ({ page }) => {
   await page.locator('input[name="q-3"][value="strength"]').check()
   await page.locator('input[name="q-4"][value="8"]').check()
   await page.getByRole('button', { name: 'Gerar treino' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
 
   // Procura a primeira semana que contém um conjugado (a geração é determinística; haverá pelo menos
   // uma). Abre, checa o selo + a sequência, e volta.
@@ -30,7 +30,7 @@ test('conjugado renderiza a sequência de componentes', async ({ page }) => {
     }
 
     await page.getByRole('button', { name: 'Voltar ao bloco' }).click()
-    await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+    await expect(page.getByTestId('dashboard')).toBeVisible()
   }
   expect(found).toBeTruthy()
 })

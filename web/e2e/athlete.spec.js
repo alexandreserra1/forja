@@ -10,7 +10,7 @@ async function fillProfileAndGenerate(page) {
   await page.locator('input[name="q-3"][value="strength"]').check()
   await page.locator('input[name="q-4"][value="8"]').check()
   await page.getByRole('button', { name: 'Gerar treino' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
 }
 
 async function week1Exercises(page) {
@@ -18,7 +18,7 @@ async function week1Exercises(page) {
   await expect(page.getByRole('heading', { name: 'Semana 1' })).toBeVisible()
   const names = await page.locator('.min-w-40').allInnerTexts()
   await page.getByRole('button', { name: 'Voltar ao bloco' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
   return names.join('|')
 }
 
@@ -44,5 +44,5 @@ test('atletas diferentes recebem programas diferentes', async ({ page }) => {
 
   // E voltar ao atleta 1 mostra o bloco DELE (estado escopado e persistido).
   await page.locator('select').selectOption('1')
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
 })

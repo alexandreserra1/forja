@@ -16,5 +16,5 @@ test('prioriza um padrão e gera o bloco', async ({ page }) => {
   await expect(page.getByRole('checkbox', { name: 'Puxar' })).toBeChecked()
 
   await page.getByRole('button', { name: 'Gerar treino' }).click()
-  await expect(page.getByRole('heading', { name: 'Bloco de 8 semanas' })).toBeVisible()
+  await expect(page.getByTestId('dashboard')).toBeVisible()
 })
